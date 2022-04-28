@@ -299,8 +299,15 @@ func (c *sqlmock) exec(query string, args []driver.NamedValue) (*ExpectedExec, e
 		}
 		if exec, ok := next.(*ExpectedExec); ok {
 			if err := c.queryMatcher.Match(exec.expectSQL, query); err != nil {
-				next.Unlock()
-				continue
+				var errShuffle *ErrShuffle
+				if errors.As(err, &errShuffle) {
+					if exec != nil {
+						errShuffle.ShuffleArgs(exec.args)
+					}
+				} else {
+					next.Unlock()
+					continue
+				}
 			}
 
 			if err := exec.attemptArgMatch(args); err == nil {
@@ -320,7 +327,14 @@ func (c *sqlmock) exec(query string, args []driver.NamedValue) (*ExpectedExec, e
 	defer expected.Unlock()
 
 	if err := c.queryMatcher.Match(expected.expectSQL, query); err != nil {
-		return nil, fmt.Errorf("ExecQuery: %v", err)
+		var errShuffle *ErrShuffle
+		if errors.As(err, &errShuffle) {
+			if expected != nil {
+				errShuffle.ShuffleArgs(expected.args)
+			}
+		} else {
+			return nil, fmt.Errorf("ExecQuery: %v", err)
+		}
 	}
 
 	if err := expected.argsMatches(args); err != nil {

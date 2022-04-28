@@ -1,10 +1,37 @@
 package sqlmock
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"regexp"
 	"strings"
 )
+
+// ErrShuffle defines an error value, which can be expected in case of
+// the expected args needing to be shuffled.
+type ErrShuffle struct {
+	Shuffle map[int]int
+}
+
+func (e *ErrShuffle) Error() string {
+	return fmt.Sprintf("Shuffle: %v", e.Shuffle)
+}
+
+// ShuffleArgs shuffle the expected args according to the Shuffle map.
+func (e *ErrShuffle) ShuffleArgs(args []driver.Value) {
+	shuffled := make([]driver.Value, len(args))
+	for oldPos, x := range args {
+		if newPos, ok := e.Shuffle[oldPos]; ok {
+			shuffled[newPos] = x
+		} else {
+			shuffled[oldPos] = x
+		}
+	}
+
+	for i, x := range shuffled {
+		args[i] = x
+	}
+}
 
 var re = regexp.MustCompile("\\s+")
 
